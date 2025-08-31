@@ -1,0 +1,32 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    margin: 0;
+    overflow: hidden; /* Mencegah scroll/geser */
+    background: #000; /* Latar belakang hitam premium */
+    color: #FFD700; /* Warna teks emas */
+    font-size: 18px;
+    font-family: Arial, sans-serif;
+  }
+  .marquee {
+    position: absolute;
+    white-space: nowrap;
+    animation: marquee 15s linear infinite;
+  }
+  @keyframes marquee {
+    from { transform: translateX(100%); }
+    to { transform: translateX(-100%); }
+  }
+</style>
+</head>
+<body>
+  <div class="marquee">
+    ⚠️ Semua kegiatan Family 77 bersifat latihan, bukan ajakan investasi. Fokus kami adalah pembelajaran dan peningkatan skill trading. ⚠️
+  </div>
+</body>
+</html>
