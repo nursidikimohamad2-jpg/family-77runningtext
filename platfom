@@ -1,0 +1,140 @@
+import React, { useEffect, useRef, useState } from "react";
+import { createChart, ColorType } from "lightweight-charts";
+
+// --- Mock OHLC data (5m candles) ---
+const seedData = [
+  { time: 1727480400, open: 1905.2, high: 1907.1, low: 1903.8, close: 1904.7 },
+  { time: 1727480700, open: 1904.7, high: 1906.4, low: 1902.9, close: 1906.1 },
+  { time: 1727481000, open: 1906.1, high: 1907.9, low: 1905.3, close: 1907.4 },
+  { time: 1727481300, open: 1907.4, high: 1908.2, low: 1905.9, close: 1906.0 },
+  { time: 1727481600, open: 1906.0, high: 1906.8, low: 1903.1, close: 1903.6 },
+  { time: 1727481900, open: 1903.6, high: 1904.9, low: 1902.6, close: 1904.3 },
+  { time: 1727482200, open: 1904.3, high: 1905.5, low: 1903.8, close: 1905.1 },
+  { time: 1727482500, open: 1905.1, high: 1906.2, low: 1904.0, close: 1905.8 },
+  { time: 1727482800, open: 1905.8, high: 1907.4, low: 1905.6, close: 1906.9 },
+  { time: 1727483100, open: 1906.9, high: 1908.0, low: 1905.7, close: 1907.8 },
+];
+
+function useResizeObserver(targetRef, onSize) {
+  useEffect(() => {
+    const el = targetRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => onSize(el.clientWidth, el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [targetRef, onSize]);
+}
+
+export default function App() {
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+  const candleRef = useRef(null);
+  const [pnl, setPnl] = useState(0);
+
+  // Create chart once
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const chart = createChart(containerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: "#0b1220" },
+        textColor: "#d7e1ff",
+      },
+      grid: {
+        vertLines: { color: "#1e293b" },
+        horzLines: { color: "#1e293b" },
+      },
+      rightPriceScale: { borderColor: "#253248" },
+      timeScale: { borderColor: "#253248" },
+      crosshair: { mode: 1 },
+      autoSize: true,
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
+      borderUpColor: "#22c55e",
+      borderDownColor: "#ef4444",
+    });
+    candleSeries.setData(seedData);
+
+    chartRef.current = chart;
+    candleRef.current = candleSeries;
+
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      candleRef.current = null;
+    };
+  }, []);
+
+  // Keep chart sized to container
+  useResizeObserver(containerRef, () => {
+    chartRef.current?.applyOptions({ autoSize: true });
+  });
+
+  // --- Mock Add Candle (simulate live) ---
+  const addNextCandle = () => {
+    if (!candleRef.current) return;
+    const last = seedData[seedData.length - 1];
+    const step = 60 * 5; // 5m
+    const nextTime = last.time + step;
+    const base = last.close;
+    const rnd = (v) => parseFloat((v).toFixed(1));
+    const high = rnd(base + Math.random() * 2.0);
+    const low = rnd(base - Math.random() * 2.0);
+    const close = rnd(low + Math.random() * (high - low));
+    const open = last.close;
+    const next = { time: nextTime, open, high, low, close };
+    seedData.push(next);
+    candleRef.current.update(next);
+  };
+
+  // --- Mock Trade Buttons: just drop a marker & simulate PnL ---
+  const placeMarker = (type) => {
+    const series = candleRef.current;
+    if (!series) return;
+    const last = seedData[seedData.length - 1];
+    const price = last.close;
+    const color = type === "BUY" ? "#22c55e" : "#ef4444";
+    series.setMarkers([
+      { time: last.time, position: type === "BUY" ? "belowBar" : "aboveBar", color, shape: "arrowUp", text: `${type} @ ${price}` },
+    ]);
+
+    // crude PnL sim
+    const move = (Math.random() - 0.5) * 4; // -2..+2
+    const result = type === "BUY" ? move : -move;
+    setPnl((p) => Math.round((p + result) * 10) / 10);
+  };
+
+  // --- Example: send to your broker webhook/bridge ---
+  // Replace URL with your bridge (MetaAPI, FIX, MT5 gateway, etc.)
+  async function sendOrder({ side, symbol = "XAUUSD", qty = 0.01, type = "market" }) {
+    try {
+      await fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ side, symbol, qty, type }),
+      });
+      // Handle result (toast, etc)
+    } catch (e) {
+      // Handle error (toast, etc)
+    }
+  }
+
+  return (
+    <div style={{ background: "#0b1220", minHeight: "100vh", color: "#d7e1ff" }}>
+      <div style={{ height: 400, width: "100%", maxWidth: 800, margin: "auto" }} ref={containerRef} />
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, margin: "16px 0" }}>
+        <button onClick={addNextCandle} style={{ padding: "8px 16px" }}>Simulate Next Candle</button>
+        <button onClick={() => { placeMarker("BUY"); sendOrder({ side: "buy" }) }} style={{ padding: "8px 16px", color: "#22c55e" }}>Buy</button>
+        <button onClick={() => { placeMarker("SELL"); sendOrder({ side: "sell" }) }} style={{ padding: "8px 16px", color: "#ef4444" }}>Sell</button>
+      </div>
+      <div style={{ textAlign: "center", fontSize: "1.2em" }}>
+        PnL: <span style={{ color: pnl >= 0 ? "#22c55e" : "#ef4444" }}>{pnl}</span>
+      </div>
+    </div>
+  );
+}
